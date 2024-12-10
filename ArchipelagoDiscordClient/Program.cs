@@ -5,6 +5,7 @@ using Discord.Net;
 using System.Text;
 using Archipelago.MultiClient.Net.Packets;
 using System.Threading.Channels;
+using Archipelago.MultiClient.Net.Enums;
 
 namespace ArchipelagoDiscordBot
 {
@@ -196,7 +197,7 @@ namespace ArchipelagoDiscordBot
             {
                 var session = ArchipelagoSessionFactory.CreateSession(ip, (int)port);
                 Console.WriteLine($"Trying to connect");
-                LoginResult result = session.TryConnectAndLogin(game, name, Archipelago.MultiClient.Net.Enums.ItemsHandlingFlags.AllItems, password: password);
+                LoginResult result = session.TryConnectAndLogin(game, name, ItemsHandlingFlags.AllItems, new Version(0, 4, 5), ["Tracker"], null, password, true);
 
                 if (result is LoginFailure failure)
                 {
