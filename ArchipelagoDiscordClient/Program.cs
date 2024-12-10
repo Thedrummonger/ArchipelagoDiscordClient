@@ -87,12 +87,18 @@ namespace ArchipelagoDiscordBot
                 .WithDescription("Show the active Archipelago session for this channel")
                 .Build();
 
+            var showHintsCommand = new SlashCommandBuilder()
+                .WithName("show_hints")
+                .WithDescription("Shows all hint for the current player")
+                .Build();
+
             try
             {
                 await _client.CreateGlobalApplicationCommandAsync(connectCommand);
                 await _client.CreateGlobalApplicationCommandAsync(disconnectCommand);
                 await _client.CreateGlobalApplicationCommandAsync(showSessionsCommand);
                 await _client.CreateGlobalApplicationCommandAsync(showChannelSessionCommand);
+                await _client.CreateGlobalApplicationCommandAsync(showHintsCommand);
             }
             catch (HttpException ex)
             {
@@ -119,7 +125,40 @@ namespace ArchipelagoDiscordBot
                 case "show_channel_session":
                     await HandleShowChannelSessionCommand(command);
                     break;
+
+                case "show_hints":
+                    await HandleShowHintsCommand(command);
+                    break;
             }
+        }
+
+        private async Task HandleShowHintsCommand(SocketSlashCommand command)
+        {
+            var guildId = command.GuildId ?? 0;
+            var channelId = command.Channel.Id;
+
+            // Check if the guild and channel have an active session
+            if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
+            {
+                await command.RespondAsync("This channel is not connected to any Archipelago session.", ephemeral: true);
+                return;
+            }
+
+            if (_client.GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
+
+            var hints = session.DataStorage.GetHints();
+            List<string> Messages = [];
+            foreach (var hint in hints)
+            {
+                string HintLine = $"{session.Players.GetPlayerName(hint.FindingPlayer)} has " +
+                    $"{session.Items.GetItemName(hint.ItemId)} at " +
+                    $"{session.Locations.GetLocationNameFromId(hint.LocationId)} for" +
+                    $"{session.Players.GetPlayerName(hint.ReceivingPlayer)} ({(hint.Found?"Found":"Not Found")})";
+                Messages.Add(HintLine);
+            }
+            if (Messages.Count < 1) { return; }
+            var Message = String.Join("\n", Messages);
+            await channel.SendMessageAsync(Message);
         }
 
         private async Task HandleConnectCommand(SocketSlashCommand command)
