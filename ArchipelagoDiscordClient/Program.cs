@@ -4,6 +4,7 @@ using Archipelago.MultiClient.Net;
 using Discord.Net;
 using System.Text;
 using Archipelago.MultiClient.Net.Packets;
+using System.Threading.Channels;
 
 namespace ArchipelagoDiscordBot
 {
@@ -144,8 +145,6 @@ namespace ArchipelagoDiscordBot
                 return;
             }
 
-            if (_client.GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
-
             var hints = session.DataStorage.GetHints();
             List<string> Messages = [];
             foreach (var hint in hints)
@@ -158,7 +157,8 @@ namespace ArchipelagoDiscordBot
             }
             if (Messages.Count < 1) { return; }
             var Message = String.Join("\n", Messages);
-            await channel.SendMessageAsync(Message);
+            await command.RespondAsync(Message, ephemeral: false);
+            //await channel.SendMessageAsync(Message);
         }
 
         private async Task HandleConnectCommand(SocketSlashCommand command)
@@ -348,12 +348,13 @@ namespace ArchipelagoDiscordBot
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Failed to send message to Archipelago: {ex.Message}");
-                    await textChannel.SendMessageAsync("Error: Unable to send message to the Archipelago server.");
+                    QueueMessage(textChannel, "Error: Unable to send message to the Archipelago server.");
+                    //await textChannel.SendMessageAsync("Error: Unable to send message to the Archipelago server.");
                 }
             }
         }
 
-        private Task LogAsync(Discord.LogMessage logMessage)
+        private Task LogAsync(LogMessage logMessage)
         {
             Console.WriteLine(logMessage.ToString());
             return Task.CompletedTask;
@@ -369,6 +370,7 @@ namespace ArchipelagoDiscordBot
                         await i.Key.SendMessageAsync(string.Join('\n', i.Value));
                         i.Value.Clear();
                     }
+                    await Task.Delay(500);
                 }
                 // No messages to process; wait briefly
                 await Task.Delay(500);
