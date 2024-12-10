@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using Discord;
+﻿using Discord;
 using Discord.WebSocket;
 using Archipelago.MultiClient.Net;
 using Discord.Net;
-using Archipelago.MultiClient.Net.MessageLog.Messages;
 using System.Text;
 using Archipelago.MultiClient.Net.Packets;
 
@@ -18,6 +13,9 @@ namespace ArchipelagoDiscordBot
 
         // Dictionary structure: GuildID -> ChannelID -> ArchipelagoSession
         private Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions = new Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>>();
+        private Dictionary<ulong, string> _originalChannelNames = new Dictionary<ulong, string>();
+
+        private Dictionary<ISocketMessageChannel, List<string>> _sendQueue = new Dictionary<ISocketMessageChannel, List<string>>();
 
         static async Task Main(string[] args)
         {
@@ -27,9 +25,11 @@ namespace ArchipelagoDiscordBot
 
         public async Task RunBotAsync()
         {
+            Task.Run(() => ProcessMessageQueueAsync());
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
-                LogLevel = LogSeverity.Info
+                LogLevel = LogSeverity.Info,
+                GatewayIntents = GatewayIntents.All
             });
 
             _client.Log += LogAsync;
@@ -173,11 +173,23 @@ namespace ArchipelagoDiscordBot
                     StringBuilder stringBuilder = new StringBuilder();
                     foreach (var part in message.Parts) { stringBuilder.Append(part.Text); }
                     if (_client.GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
-                    await channel.SendMessageAsync(stringBuilder.ToString());
+                    if (string.IsNullOrWhiteSpace(stringBuilder.ToString())) { return; }
+                    QueueMessage(channel, stringBuilder.ToString());
+                    //await channel.SendMessageAsync(stringBuilder.ToString());
+                };
+                session.Socket.SocketClosed += async (reason) =>
+                {
+                    await CleanAndCloseChannel(guildId, channelId);
                 };
 
                 // Store the session
                 _activeSessions[guildId][channelId] = session;
+
+                if (command.Channel is SocketTextChannel textChannel)
+                {
+                    _originalChannelNames[channelId] = textChannel.Name;
+                    await textChannel.ModifyAsync(prop => prop.Name = $"{name}_{game}_{ip.Replace(".", "-")}-{port}");
+                }
 
                 await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully connected channel {channelName} to Archipelago server at {ip}:{port} as {name}.");
             }
@@ -185,6 +197,12 @@ namespace ArchipelagoDiscordBot
             {
                 await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Failed to connect: {ex.Message}");
             }
+        }
+
+        private void QueueMessage(ISocketMessageChannel channel, string Message)
+        {
+            if (!_sendQueue.ContainsKey(channel)) { _sendQueue[channel] = []; }
+            _sendQueue[channel].Add(Message);
         }
 
         private async Task HandleDisconnectCommand(SocketSlashCommand command)
@@ -199,17 +217,26 @@ namespace ArchipelagoDiscordBot
                 return;
             }
 
-            // Disconnect and remove the session
-            await session.Socket.DisconnectAsync();
-            guildSessions.Remove(channelId);
+            await CleanAndCloseChannel(guildId, channelId);
 
-            // Clean up the guild dictionary if no channels remain
+            await command.RespondAsync("Successfully disconnected from the Archipelago server.");
+        }
+
+        private async Task CleanAndCloseChannel(ulong guildId, ulong channelId)
+        {
+            if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session)) { return; }
+            if (session.Socket.Connected) { await session.Socket.DisconnectAsync(); }
+            guildSessions.Remove(channelId);
             if (guildSessions.Count == 0)
             {
                 _activeSessions.Remove(guildId);
             }
-
-            await command.RespondAsync("Successfully disconnected from the Archipelago server.");
+            var channel = _client.GetChannel(channelId);
+            if (channel is SocketTextChannel textChannel && _originalChannelNames.TryGetValue(channelId, out var originalName))
+            {
+                await textChannel.ModifyAsync(prop => prop.Name = originalName);
+                _originalChannelNames.Remove(channelId);
+            }
         }
 
         private async Task HandleShowSessionsCommand(SocketSlashCommand command)
@@ -291,6 +318,22 @@ namespace ArchipelagoDiscordBot
         {
             Console.WriteLine(logMessage.ToString());
             return Task.CompletedTask;
+        }
+        private async Task ProcessMessageQueueAsync()
+        {
+            while (true)
+            {
+                foreach (var i in _sendQueue)
+                {
+                    if (i.Value.Count > 0)
+                    {
+                        await i.Key.SendMessageAsync(string.Join('\n', i.Value));
+                        i.Value.Clear();
+                    }
+                }
+                // No messages to process; wait briefly
+                await Task.Delay(500);
+            }
         }
     }
 }
