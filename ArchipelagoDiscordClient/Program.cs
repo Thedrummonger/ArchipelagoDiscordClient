@@ -368,7 +368,7 @@ namespace ArchipelagoDiscordBot
                 {
                     if (i.Value.Count > 0)
                     {
-                        await i.Key.SendMessageAsync(string.Join('\n', i.Value));
+                        await i.Key.SendMessageAsync($"```{string.Join('\n', i.Value)}```");
                         i.Value.Clear();
                     }
                     await Task.Delay(500);
