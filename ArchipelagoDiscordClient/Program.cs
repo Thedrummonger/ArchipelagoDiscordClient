@@ -19,6 +19,8 @@ namespace ArchipelagoDiscordBot
 
         private Dictionary<ISocketMessageChannel, List<string>> _sendQueue = new Dictionary<ISocketMessageChannel, List<string>>();
 
+        private Dictionary<ulong, SocketChannel> ChannelCache = new Dictionary<ulong, SocketChannel>();
+
         static async Task Main(string[] args)
         {
             var program = new Program();
@@ -38,6 +40,13 @@ namespace ArchipelagoDiscordBot
             _client.Ready += ReadyAsync;
             _client.SlashCommandExecuted += SlashCommandHandler;
             _client.MessageReceived += HandleMessageReceivedAsync;
+
+            if (!File.Exists("bot_token.txt"))
+            {
+                Console.WriteLine("Please enter Discord Bot Token");
+                var UserToken = Console.ReadLine();
+                File.WriteAllText("bot_token.txt", UserToken);
+            }
 
             string token;
             try
@@ -106,6 +115,16 @@ namespace ArchipelagoDiscordBot
             {
                 Console.WriteLine($"Error registering commands: {ex.Message}");
             }
+        }
+
+        public SocketChannel GetChannel(ulong id)
+        {
+            if (!ChannelCache.TryGetValue(id, out SocketChannel? channel))
+            {
+                channel = _client.GetChannel(id);
+                ChannelCache.Add(id, channel);
+            }
+            return channel;
         }
 
         private async Task SlashCommandHandler(SocketSlashCommand command)
@@ -208,11 +227,11 @@ namespace ArchipelagoDiscordBot
 
                 Console.WriteLine($"Connected");
                 // Register the OnMessageReceived event handler
-                session.MessageLog.OnMessageReceived += async (Archipelago.MultiClient.Net.MessageLog.Messages.LogMessage message) =>
+                session.MessageLog.OnMessageReceived += (Archipelago.MultiClient.Net.MessageLog.Messages.LogMessage message) =>
                 {
                     StringBuilder stringBuilder = new StringBuilder();
                     foreach (var part in message.Parts) { stringBuilder.Append(part.Text); }
-                    if (_client.GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
+                    if (GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
                     if (string.IsNullOrWhiteSpace(stringBuilder.ToString())) { return; }
                     QueueMessage(channel, stringBuilder.ToString());
                     //await channel.SendMessageAsync(stringBuilder.ToString());
@@ -271,7 +290,7 @@ namespace ArchipelagoDiscordBot
             {
                 _activeSessions.Remove(guildId);
             }
-            var channel = _client.GetChannel(channelId);
+            var channel = GetChannel(channelId);
             if (channel is SocketTextChannel textChannel && _originalChannelNames.TryGetValue(channelId, out var originalName))
             {
                 await textChannel.ModifyAsync(prop => prop.Name = originalName);
@@ -366,11 +385,15 @@ namespace ArchipelagoDiscordBot
             {
                 foreach (var i in _sendQueue)
                 {
-                    if (i.Value.Count > 0)
+                    if (i.Value.Count == 0) { continue; }
+                    List<string> sendQueue = [];
+                    while (i.Value.Count > 0 && sendQueue.Count < 10)
                     {
-                        await i.Key.SendMessageAsync($"```{string.Join('\n', i.Value)}```");
-                        i.Value.Clear();
+                        sendQueue.Add(i.Value[0]);
+                        i.Value.RemoveAt(0);
                     }
+                    string FormattedMessage = $"```\n{string.Join('\n', sendQueue)}\n```";
+                    await i.Key.SendMessageAsync(FormattedMessage);
                     await Task.Delay(500);
                 }
                 // No messages to process; wait briefly
