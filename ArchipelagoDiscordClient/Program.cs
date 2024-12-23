@@ -17,9 +17,9 @@ namespace ArchipelagoDiscordBot
         private Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions = new Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>>();
         private Dictionary<ulong, string> _originalChannelNames = new Dictionary<ulong, string>();
 
-        private Dictionary<ISocketMessageChannel, List<string>> _sendQueue = new Dictionary<ISocketMessageChannel, List<string>>();
+        private Dictionary<SocketTextChannel, List<string>> _sendQueue = new Dictionary<SocketTextChannel, List<string>>();
 
-        private Dictionary<ulong, SocketChannel> ChannelCache = new Dictionary<ulong, SocketChannel>();
+        private Dictionary<ulong, SocketTextChannel?> ChannelCache = new Dictionary<ulong, SocketTextChannel?>();
 
         static async Task Main(string[] args)
         {
@@ -117,12 +117,13 @@ namespace ArchipelagoDiscordBot
             }
         }
 
-        public SocketChannel GetChannel(ulong id)
+        public SocketTextChannel? GetChannel(ulong id)
         {
-            if (!ChannelCache.TryGetValue(id, out SocketChannel? channel))
+            if (!ChannelCache.TryGetValue(id, out SocketTextChannel? channel))
             {
-                channel = _client.GetChannel(id);
-                ChannelCache.Add(id, channel);
+                SocketTextChannel? Channel = null;
+                if (_client.GetChannel(id) is SocketTextChannel TC) { return Channel = TC; }
+                ChannelCache.Add(id, Channel);
             }
             return channel;
         }
@@ -157,6 +158,12 @@ namespace ArchipelagoDiscordBot
         {
             var guildId = command.GuildId ?? 0;
             var channelId = command.Channel.Id;
+            if (command.Channel is not SocketTextChannel socketTextChannel)
+            {
+                await command.RespondAsync("Only Text Channels are Supported", ephemeral: true); 
+                return; 
+            }
+            ChannelCache.TryAdd(channelId, socketTextChannel);
 
             // Check if the guild and channel have an active session
             if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
@@ -186,6 +193,12 @@ namespace ArchipelagoDiscordBot
             var guildId = command.GuildId ?? 0;
             var channelId = command.Channel.Id;
             string channelName = command.Channel?.Name ?? channelId.ToString();
+            if (command.Channel is not SocketTextChannel socketTextChannel)
+            {
+                await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
+                return;
+            }
+            ChannelCache.TryAdd(channelId, socketTextChannel);
 
             // Ensure the guild dictionary exists
             if (!_activeSessions.ContainsKey(guildId))
@@ -231,8 +244,9 @@ namespace ArchipelagoDiscordBot
                 {
                     StringBuilder stringBuilder = new StringBuilder();
                     foreach (var part in message.Parts) { stringBuilder.Append(part.Text); }
-                    if (GetChannel(channelId) is not ISocketMessageChannel channel) { return; }
+                    if (GetChannel(channelId) is not SocketTextChannel channel) { return; }
                     if (string.IsNullOrWhiteSpace(stringBuilder.ToString())) { return; }
+                    Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
                     QueueMessage(channel, stringBuilder.ToString());
                     //await channel.SendMessageAsync(stringBuilder.ToString());
                 };
@@ -258,7 +272,7 @@ namespace ArchipelagoDiscordBot
             }
         }
 
-        private void QueueMessage(ISocketMessageChannel channel, string Message)
+        private void QueueMessage(SocketTextChannel channel, string Message)
         {
             if (!_sendQueue.ContainsKey(channel)) { _sendQueue[channel] = []; }
             _sendQueue[channel].Add(Message);
@@ -268,6 +282,12 @@ namespace ArchipelagoDiscordBot
         {
             var guildId = command.GuildId ?? 0;
             var channelId = command.Channel.Id;
+            if (command.Channel is not SocketTextChannel socketTextChannel)
+            {
+                await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
+                return;
+            }
+            ChannelCache.TryAdd(channelId, socketTextChannel);
 
             // Check if the guild and channel have an active session
             if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
@@ -284,13 +304,15 @@ namespace ArchipelagoDiscordBot
         private async Task CleanAndCloseChannel(ulong guildId, ulong channelId)
         {
             if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session)) { return; }
+            var channel = GetChannel(channelId);
+            if (channel == null) { return; }
+            Console.WriteLine($"Disconnecting Channel {channel.Id} from server {session.ConnectionInfo.Slot}");
             if (session.Socket.Connected) { await session.Socket.DisconnectAsync(); }
             guildSessions.Remove(channelId);
             if (guildSessions.Count == 0)
             {
                 _activeSessions.Remove(guildId);
             }
-            var channel = GetChannel(channelId);
             if (channel is SocketTextChannel textChannel && _originalChannelNames.TryGetValue(channelId, out var originalName))
             {
                 await textChannel.ModifyAsync(prop => prop.Name = originalName);
@@ -313,7 +335,7 @@ namespace ArchipelagoDiscordBot
             var response = "Active Archipelago Sessions:\n";
             foreach (var (channelId, session) in guildSessions)
             {
-                var channel = _client.GetChannel(channelId) as SocketTextChannel;
+                var channel = GetChannel(channelId);
                 if (channel == null) continue;
 
                 response += $"- **Channel**: {channel.Name}\n" +
@@ -328,6 +350,12 @@ namespace ArchipelagoDiscordBot
         {
             var guildId = command.GuildId ?? 0;
             var channelId = command.Channel.Id;
+            if (command.Channel is not SocketTextChannel socketTextChannel)
+            {
+                await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
+                return;
+            }
+            ChannelCache.TryAdd(channelId, socketTextChannel);
 
             // Check if the channel has an active session
             if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
@@ -350,7 +378,8 @@ namespace ArchipelagoDiscordBot
             if (message.Author.IsBot) return;
 
             // Check if the message was sent in a guild text channel
-            if (message.Channel is not SocketTextChannel textChannel) return;
+            if (message.Channel is not SocketTextChannel textChannel) { return; }
+            ChannelCache.TryAdd(message.Channel.Id, textChannel);
 
             var guildId = textChannel.Guild.Id;
             var channelId = textChannel.Id;
@@ -363,7 +392,7 @@ namespace ArchipelagoDiscordBot
                 {
                     // Send the message to the Archipelago server
                     session.Socket.SendPacket(new SayPacket() { Text = message.Content } );
-                    Console.WriteLine($"Message sent to Archipelago from {message.Author.Username}: {message.Content}");
+                    Console.WriteLine($"Message sent to Archipelago from {message.Author.Username} in {message.Channel.Name}: {message.Content}");
                 }
                 catch (Exception ex)
                 {
@@ -393,6 +422,7 @@ namespace ArchipelagoDiscordBot
                         i.Value.RemoveAt(0);
                     }
                     string FormattedMessage = $"```\n{string.Join('\n', sendQueue)}\n```";
+                    Console.WriteLine($"Sending {sendQueue.Count} Queued messages to channel {i.Key.Name}");
                     await i.Key.SendMessageAsync(FormattedMessage);
                     await Task.Delay(500);
                 }
