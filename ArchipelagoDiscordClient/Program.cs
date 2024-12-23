@@ -4,7 +4,6 @@ using Archipelago.MultiClient.Net;
 using Discord.Net;
 using System.Text;
 using Archipelago.MultiClient.Net.Packets;
-using System.Threading.Channels;
 using Archipelago.MultiClient.Net.Enums;
 
 namespace ArchipelagoDiscordBot
@@ -172,19 +171,62 @@ namespace ArchipelagoDiscordBot
                 return;
             }
 
+            Console.WriteLine($"Showing hints for slot {session.ConnectionInfo.Slot}");
+
             var hints = session.DataStorage.GetHints();
+            Console.WriteLine($"{hints.Length} Found");
             List<string> Messages = [];
             foreach (var hint in hints)
             {
-                string HintLine = $"{session.Players.GetPlayerName(hint.FindingPlayer)} has " +
-                    $"{session.Items.GetItemName(hint.ItemId)} at " +
-                    $"{session.Locations.GetLocationNameFromId(hint.LocationId)} for" +
-                    $"{session.Players.GetPlayerName(hint.ReceivingPlayer)} ({(hint.Found?"Found":"Not Found")})";
+                var FindingPlayer = session.Players.GetPlayerInfo(hint.FindingPlayer);
+                var ReceivingPlayer = session.Players.GetPlayerInfo(hint.ReceivingPlayer);
+                var Item = session.Items.GetItemName(hint.ItemId, ReceivingPlayer.Game);
+                var Location = session.Locations.GetLocationNameFromId(hint.LocationId, FindingPlayer.Game);
+
+                var FindingPlayerName = FindingPlayer.Name;
+                var ReceivingPlayerName = ReceivingPlayer.Name;
+
+                var FoundString = hint.Found ? 
+                    ColorString("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
+                    ColorString("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
+                if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Plum); }
+                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
+                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Salmon); }
+                else { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Cyan); }
+                Location = ColorString(Location, Archipelago.MultiClient.Net.Models.Color.Green);
+
+                if (FindingPlayer.Slot == session.ConnectionInfo.Slot) 
+                { 
+                    FindingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta); 
+                }
+                else
+                {
+                    FindingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                }
+
+                if (ReceivingPlayer.Slot == session.ConnectionInfo.Slot)
+                {
+                    ReceivingPlayerName = ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta);
+                }
+                else
+                {
+                    ReceivingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                }
+
+                string HintLine = $"{FindingPlayerName} has {Item} at {Location} for {ReceivingPlayerName} ({FoundString})";
                 Messages.Add(HintLine);
             }
-            if (Messages.Count < 1) { return; }
-            var Message = String.Join("\n", Messages);
-            await command.RespondAsync(Message, ephemeral: false);
+            if (Messages.Count < 1) 
+            {
+                await command.RespondAsync("No hints available for this slot.", ephemeral: true);
+                return; 
+            }
+            //var Message = $"```ansi\n{string.Join('\n', Messages)}\n```";
+            await command.RespondAsync($"Hints for {session.Players.GetPlayerName(session.ConnectionInfo.Slot)}", ephemeral: false);
+            foreach (var i in Messages) 
+            {
+                QueueMessage(socketTextChannel, i);
+            }
             //await channel.SendMessageAsync(Message);
         }
 
@@ -229,7 +271,7 @@ namespace ArchipelagoDiscordBot
             {
                 var session = ArchipelagoSessionFactory.CreateSession(ip, (int)port);
                 Console.WriteLine($"Trying to connect");
-                LoginResult result = session.TryConnectAndLogin(game, name, ItemsHandlingFlags.AllItems, new Version(0, 4, 5), ["Tracker"], null, password, true);
+                LoginResult result = session.TryConnectAndLogin(game, name, ItemsHandlingFlags.AllItems, new Version(0, 5, 1), ["Tracker"], null, password, true);
 
                 if (result is LoginFailure failure)
                 {
@@ -243,7 +285,10 @@ namespace ArchipelagoDiscordBot
                 session.MessageLog.OnMessageReceived += (Archipelago.MultiClient.Net.MessageLog.Messages.LogMessage message) =>
                 {
                     StringBuilder stringBuilder = new StringBuilder();
-                    foreach (var part in message.Parts) { stringBuilder.Append(part.Text); }
+                    foreach (var part in message.Parts) 
+                    { 
+                        stringBuilder.Append(ColorString(part.Text, part.Color)); 
+                    }
                     if (GetChannel(channelId) is not SocketTextChannel channel) { return; }
                     if (string.IsNullOrWhiteSpace(stringBuilder.ToString())) { return; }
                     Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
@@ -260,8 +305,8 @@ namespace ArchipelagoDiscordBot
 
                 if (command.Channel is SocketTextChannel textChannel)
                 {
-                    _originalChannelNames[channelId] = textChannel.Name;
-                    await textChannel.ModifyAsync(prop => prop.Name = $"{name}_{game}_{ip.Replace(".", "-")}-{port}");
+                    //_originalChannelNames[channelId] = textChannel.Name;
+                    //await textChannel.ModifyAsync(prop => prop.Name = $"{name}_{game}_{ip.Replace(".", "-")}-{port}");
                 }
 
                 await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully connected channel {channelName} to Archipelago server at {ip}:{port} as {name}.");
@@ -271,6 +316,27 @@ namespace ArchipelagoDiscordBot
                 await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Failed to connect: {ex.Message}");
             }
         }
+
+        public string ColorString(string input, Archipelago.MultiClient.Net.Models.Color color)
+        {
+            if (!ColorCodes.TryGetValue(color, out Tuple<string, string> Parts)) { return input; }
+            return $"{Parts.Item1}{input}{Parts.Item2}";
+        }
+
+        readonly Dictionary<Archipelago.MultiClient.Net.Models.Color, Tuple<string, string>> ColorCodes = new()
+        {
+            { Archipelago.MultiClient.Net.Models.Color.Red, new (@"[2;31m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Green, new (@"[2;32m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Yellow, new (@"[2;33m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Blue, new (@"[2;34m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Magenta, new (@"[2;35m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Cyan, new (@"[2;36m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Black, new (@"[2;30m", @"[0m") },
+            //{ Archipelago.MultiClient.Net.Models.Color.White, new (@"[2;37m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.SlateBlue, new (@"[2;34m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Salmon, new (@"[2;33m", @"[0m") },
+            { Archipelago.MultiClient.Net.Models.Color.Plum, new (@"[2;35m", @"[0m") }
+        };
 
         private void QueueMessage(SocketTextChannel channel, string Message)
         {
@@ -315,8 +381,8 @@ namespace ArchipelagoDiscordBot
             }
             if (channel is SocketTextChannel textChannel && _originalChannelNames.TryGetValue(channelId, out var originalName))
             {
-                await textChannel.ModifyAsync(prop => prop.Name = originalName);
-                _originalChannelNames.Remove(channelId);
+                //await textChannel.ModifyAsync(prop => prop.Name = originalName);
+                //_originalChannelNames.Remove(channelId);
             }
         }
 
@@ -416,12 +482,14 @@ namespace ArchipelagoDiscordBot
                 {
                     if (i.Value.Count == 0) { continue; }
                     List<string> sendQueue = [];
-                    while (i.Value.Count > 0 && sendQueue.Count < 10)
+                    int MessageLength = 6; //Include the formatter
+                    while (i.Value.Count > 0 && MessageLength < 1500)
                     {
+                        MessageLength += i.Value[0].Length + 2; //Include the new line chars that will be added later
                         sendQueue.Add(i.Value[0]);
                         i.Value.RemoveAt(0);
                     }
-                    string FormattedMessage = $"```\n{string.Join('\n', sendQueue)}\n```";
+                    string FormattedMessage = $"```ansi\n{string.Join("\n\n", sendQueue)}\n```";
                     Console.WriteLine($"Sending {sendQueue.Count} Queued messages to channel {i.Key.Name}");
                     await i.Key.SendMessageAsync(FormattedMessage);
                     await Task.Delay(500);
