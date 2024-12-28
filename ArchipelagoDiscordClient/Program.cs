@@ -5,8 +5,9 @@ using Discord.Net;
 using System.Text;
 using Archipelago.MultiClient.Net.Packets;
 using Archipelago.MultiClient.Net.Enums;
+using System.Text.RegularExpressions;
 
-namespace ArchipelagoDiscordBot
+namespace ArchipelagoDiscordClient
 {
     class Program
     {
@@ -19,6 +20,9 @@ namespace ArchipelagoDiscordBot
         private Dictionary<SocketTextChannel, List<string>> _sendQueue = new Dictionary<SocketTextChannel, List<string>>();
 
         private Dictionary<ulong, SocketTextChannel?> ChannelCache = new Dictionary<ulong, SocketTextChannel?>();
+
+        private HashSet<string> IgnoreTags = ["tracker"];
+        private bool IgnoreAllClients = false;
 
         static async Task Main(string[] args)
         {
@@ -121,7 +125,7 @@ namespace ArchipelagoDiscordBot
             if (!ChannelCache.TryGetValue(id, out SocketTextChannel? channel))
             {
                 SocketTextChannel? Channel = null;
-                if (_client.GetChannel(id) is SocketTextChannel TC) { return Channel = TC; }
+                if (_client.GetChannel(id) is SocketTextChannel TC) { Channel = TC; }
                 ChannelCache.Add(id, Channel);
             }
             return channel;
@@ -187,30 +191,30 @@ namespace ArchipelagoDiscordBot
                 var ReceivingPlayerName = ReceivingPlayer.Name;
 
                 var FoundString = hint.Found ? 
-                    ColorString("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
-                    ColorString("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
-                if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Plum); }
-                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
-                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Salmon); }
-                else { Item = ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Cyan); }
-                Location = ColorString(Location, Archipelago.MultiClient.Net.Models.Color.Green);
+                    Utility.ColorString("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
+                    Utility.ColorString("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
+                if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Plum); }
+                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
+                else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Salmon); }
+                else { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Cyan); }
+                Location = Utility.ColorString(Location, Archipelago.MultiClient.Net.Models.Color.Green);
 
                 if (FindingPlayer.Slot == session.ConnectionInfo.Slot) 
                 { 
-                    FindingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta); 
+                    FindingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta); 
                 }
                 else
                 {
-                    FindingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                    FindingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
                 }
 
                 if (ReceivingPlayer.Slot == session.ConnectionInfo.Slot)
                 {
-                    ReceivingPlayerName = ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta);
+                    ReceivingPlayerName = Utility.ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta);
                 }
                 else
                 {
-                    ReceivingPlayerName = ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                    ReceivingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
                 }
 
                 string HintLine = $"{FindingPlayerName} has {Item} at {Location} for {ReceivingPlayerName} ({FoundString})";
@@ -284,15 +288,18 @@ namespace ArchipelagoDiscordBot
                 // Register the OnMessageReceived event handler
                 session.MessageLog.OnMessageReceived += (Archipelago.MultiClient.Net.MessageLog.Messages.LogMessage message) =>
                 {
-                    StringBuilder stringBuilder = new StringBuilder();
+                    StringBuilder FormattedMessage = new StringBuilder();
+                    StringBuilder RawMessage = new StringBuilder();
                     foreach (var part in message.Parts) 
                     { 
-                        stringBuilder.Append(ColorString(part.Text, part.Color)); 
+                        FormattedMessage.Append(Utility.ColorString(part.Text, part.Color));
+                        FormattedMessage.Append(part.Text);
                     }
                     if (GetChannel(channelId) is not SocketTextChannel channel) { return; }
-                    if (string.IsNullOrWhiteSpace(stringBuilder.ToString())) { return; }
+                    if (string.IsNullOrWhiteSpace(FormattedMessage.ToString())) { return; }
                     Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
-                    QueueMessage(channel, stringBuilder.ToString());
+                    if (!CheckMessageTags(RawMessage.ToString())) { return; }
+                    QueueMessage(channel, FormattedMessage.ToString());
                     //await channel.SendMessageAsync(stringBuilder.ToString());
                 };
                 session.Socket.SocketClosed += async (reason) =>
@@ -317,26 +324,39 @@ namespace ArchipelagoDiscordBot
             }
         }
 
-        public string ColorString(string input, Archipelago.MultiClient.Net.Models.Color color)
+        private bool CheckMessageTags(string input)
         {
-            if (!ColorCodes.TryGetValue(color, out Tuple<string, string> Parts)) { return input; }
-            return $"{Parts.Item1}{input}{Parts.Item2}";
-        }
+            bool IsClient = Utility.IsClientNotification(input, out Version version);
+            if (!IsClient) { return true; }
+            Console.WriteLine($"Client Connecting V{version}");
+            if (IsClient && IgnoreAllClients) { return false; }
 
-        readonly Dictionary<Archipelago.MultiClient.Net.Models.Color, Tuple<string, string>> ColorCodes = new()
-        {
-            { Archipelago.MultiClient.Net.Models.Color.Red, new (@"[2;31m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Green, new (@"[2;32m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Yellow, new (@"[2;33m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Blue, new (@"[2;34m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Magenta, new (@"[2;35m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Cyan, new (@"[2;36m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Black, new (@"[2;30m", @"[0m") },
-            //{ Archipelago.MultiClient.Net.Models.Color.White, new (@"[2;37m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.SlateBlue, new (@"[2;34m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Salmon, new (@"[2;33m", @"[0m") },
-            { Archipelago.MultiClient.Net.Models.Color.Plum, new (@"[2;35m", @"[0m") }
-        };
+            string TagPattern = @"\[(.*?)\]"; //Tags are defined in brackets
+            MatchCollection matches = Regex.Matches(input, TagPattern);
+            HashSet<string> tags = [];
+            HashSet<string> IgnoredTags = [];
+            if (matches.Count > 0)
+            {
+                string lastMatch = matches[^1].Groups[1].Value; //Tags are always at the end of a message
+                string[] parts = lastMatch.Split(',');          //I don't think any brackets would ever appear other than the tags
+                foreach (string part in parts)                  //but just pick the last instance of brackets to be safe
+                {
+                    string PartTrimmed = part.Trim();
+                    if (!PartTrimmed.StartsWith("'") || !PartTrimmed.EndsWith("'")) { continue; } //Probably more unnecessary checking
+                    string Tag = PartTrimmed[1..^1].ToLower();                                    //But tags are always in single quotes
+                    tags.Add(Tag);
+                    if (IgnoreTags.Contains(Tag))
+                        IgnoredTags.Add(Tag);
+                }
+            }
+            Console.WriteLine($"Client Tags [{String.Join(",", tags)}]");
+            if (IgnoredTags.Count > 0)
+            {
+                Console.WriteLine($"Client was Ignored Type [{String.Join(",", IgnoredTags)}]");
+                return false;
+            }
+            return true;
+        }
 
         private void QueueMessage(SocketTextChannel channel, string Message)
         {
