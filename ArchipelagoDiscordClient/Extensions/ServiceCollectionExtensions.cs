@@ -34,6 +34,9 @@ namespace ArchipelagoDiscordClient.Extensions
 			services.AddSingleton<ICommand, ShowChannelSessionCommand>();
 			services.AddSingleton<ICommand, ShowHintsCommand>();
             services.AddSingleton<ICommand, IgnoreClientsCommand>();
+            services.AddSingleton<ICommand, AddIgnoreTypesCommand>();
+            services.AddSingleton<ICommand, DelIgnoreTypesCommand>();
+            services.AddSingleton<ICommand, ListIgnoreTypesCommand>();
             services.AddSingleton<ICommandService, CommandService>();
 			services.AddSingleton<IDiscordCommandRegistrationService, DiscordCommandRegistrationService>();
 			services.AddSingleton<IChannelService, ChannelService>();

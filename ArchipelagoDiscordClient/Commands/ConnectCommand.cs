@@ -106,7 +106,8 @@ namespace ArchipelagoDiscordClient.Commands
 					foreach (var part in message.Parts)
 					{
 						FormattedMessage.Append(Utility.ColorString(part.Text, part.Color));
-					}
+                        RawMessage.Append(part.Text);
+                    }
 					if (string.IsNullOrWhiteSpace(FormattedMessage.ToString())) { return; }
 					Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
 					if (!CheckMessageTags(RawMessage.ToString())) { return; }
