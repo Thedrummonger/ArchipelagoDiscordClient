@@ -1,16 +1,20 @@
 ﻿using ArchipelagoDiscordClient.Services;
+using ArchipelagoDiscordClient.Settings;
+using Microsoft.Extensions.Options;
 
 namespace ArchipelagoDiscordClient.Handlers
 {
 	public class MessageQueueHandler : IMessageQueueHandler
 	{
 		private readonly IMessageQueueService _messageQueueService;
+		private readonly BotSettings _settings;
 
-		private readonly int DiscordRateLimitDelay = 500;
-
-		public MessageQueueHandler(IMessageQueueService messageQueueService)
+		public MessageQueueHandler(
+			IMessageQueueService messageQueueService,
+			IOptions<BotSettings> settings)
 		{
 			_messageQueueService = messageQueueService;
+			_settings = settings.Value;
 		}
 
 		public async Task ProcessMessageQueueAsync()
@@ -49,12 +53,12 @@ namespace ArchipelagoDiscordClient.Handlers
 					Console.WriteLine($"Sending {sendBatch.Count} queued messages to channel {item.Key.Name}");
 
 					await item.Key.SendMessageAsync(formattedMessage);
-					await Task.Delay(DiscordRateLimitDelay); //Wait before processing more messages to avoid rate limit
+					await Task.Delay(_settings.DiscordRateLimitDelay); //Wait before processing more messages to avoid rate limit
 				}
 
 				//Wait before processing more messages to avoid rate limit
 				//This await could probably be removed? or at least significantly lowered. 
-				await Task.Delay(DiscordRateLimitDelay);
+				await Task.Delay(_settings.DiscordRateLimitDelay);
 			}
 		}
 	}
