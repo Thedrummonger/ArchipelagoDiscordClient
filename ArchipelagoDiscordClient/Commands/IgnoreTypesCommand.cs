@@ -41,7 +41,7 @@ namespace ArchipelagoDiscordClient.Commands
 
             File.WriteAllText(FilePaths.ConfigFileFullPath, _settings.ToFormattedJson());
 
-            await command.RespondAsync($"Added Ignored Types {string.Join(", ", values)}");
+            await command.RespondAsync($"Added Ignored Types [{string.Join(", ", values)}]");
         }
     }
     public class DelIgnoreTypesCommand : ICommand
@@ -72,7 +72,7 @@ namespace ArchipelagoDiscordClient.Commands
 
             File.WriteAllText(FilePaths.ConfigFileFullPath, _settings.ToFormattedJson());
 
-            await command.RespondAsync($"Removed Ignored Types {string.Join(", ", values)}");
+            await command.RespondAsync($"Removed Ignored Types [{string.Join(", ", values)}]");
         }
     }
     public class ListIgnoreTypesCommand : ICommand
@@ -92,7 +92,7 @@ namespace ArchipelagoDiscordClient.Commands
 
         public async Task ExecuteAsync(SocketSlashCommand command)
         {
-            await command.RespondAsync($"Ignored Types {string.Join(", ", _settings.IgnoreTags)}");
+            await command.RespondAsync($"Ignored Types [{string.Join(", ", _settings.IgnoreTags)}]");
         }
     }
 }
