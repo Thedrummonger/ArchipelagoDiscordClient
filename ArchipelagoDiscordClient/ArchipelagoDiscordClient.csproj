@@ -20,11 +20,11 @@
   <ItemGroup>
     <Folder Include="Models\" />
   </ItemGroup>
-	
-	<ItemGroup>
-		<None Update="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="TDMUtils">
+      <HintPath>TDMUtils.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 
 </Project>

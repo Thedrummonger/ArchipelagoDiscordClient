@@ -5,6 +5,8 @@ using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Settings;
 using Microsoft.Extensions.Configuration;
 using ArchipelagoDiscordClient.Extensions;
+using Microsoft.Extensions.Options;
+using TDMUtils;
 
 namespace ArchipelagoDiscordClient
 {
@@ -18,10 +20,21 @@ namespace ArchipelagoDiscordClient
 
         public async Task RunBotAsync()
         {
+			var ConfigFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DrathBot", "Archipelago");
+            var ConfigFileName = "appsettings.json";
+            var ConfigFileFullPath = Path.Combine(ConfigFilePath, ConfigFileName);
+            if (!Path.Exists(ConfigFilePath)) 
+			{
+				Directory.CreateDirectory(ConfigFilePath); 
+			}
+			if (!File.Exists(ConfigFileFullPath))
+			{
+				File.WriteAllText(ConfigFileFullPath, new SettingsFile(new BotSettings()).ToFormattedJson());
+			}
 			var serviceCollection = new ServiceCollection();
 			var configuration = new ConfigurationBuilder()
-				.SetBasePath(Directory.GetCurrentDirectory())
-				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+				.SetBasePath(ConfigFilePath)
+				.AddJsonFile(ConfigFileName, optional: false, reloadOnChange: true)
 				.Build();
 
 			// Register configuration section (e.g., BotSettings)
@@ -33,32 +46,16 @@ namespace ArchipelagoDiscordClient
 			var discordEventHandler = serviceProvider.GetRequiredService<IDiscordEventHandler>();
 			discordEventHandler.SubscribeToDiscordEvents();
 
-			if (!File.Exists("bot_token.txt"))
-            {
-                Console.WriteLine("Please enter Discord Bot Token");
-                var UserToken = Console.ReadLine();
-                File.WriteAllText("bot_token.txt", UserToken);
+            var botSettings = serviceProvider.GetRequiredService<IOptions<BotSettings>>().Value;
+
+            if (string.IsNullOrEmpty(botSettings.BotToken))
+			{
+				throw new Exception($"Please enter you bot token in {ConfigFileFullPath}");
             }
 
-            string token;
-            try
-            {
-                token = File.ReadAllText("bot_token.txt");
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    Console.WriteLine("The bot token file is empty.");
-                    return;
-                }
-            }
-            catch (FileNotFoundException)
-            {
-                Console.WriteLine("Error: bot_token.txt not found. Please create the file and add your bot token.");
-                return;
-			}
+            var discordClient = serviceProvider.GetRequiredService<DiscordSocketClient>();
 
-			var discordClient = serviceProvider.GetRequiredService<DiscordSocketClient>();
-
-			await discordClient.LoginAsync(TokenType.Bot, token.Trim());
+			await discordClient.LoginAsync(TokenType.Bot, botSettings.BotToken);
             await discordClient.StartAsync();
 
 			//Run a background task to constantly send messages in the send queue
