@@ -1,6 +1,7 @@
 ﻿using Archipelago.MultiClient.Net;
 using System.Collections.Concurrent;
 using Discord.WebSocket;
+using Discord;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -11,7 +12,12 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public string CommandName => "show_channel_session";
 
-		public ShowChannelSessionCommand(
+        public SlashCommandProperties Properties => new SlashCommandBuilder()
+                .WithName("show_channel_session")
+                .WithDescription("Show the active Archipelago session for this channel")
+                .Build();
+
+        public ShowChannelSessionCommand(
 			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
 			ConcurrentDictionary<ulong, SocketTextChannel> channelCache)
 		{

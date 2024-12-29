@@ -7,6 +7,7 @@ using ArchipelagoDiscordClient.Services;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using ArchipelagoDiscordClient.Settings;
+using Discord;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -20,8 +21,17 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly BotSettings _settings;
 
 		public string CommandName => "connect";
+        public SlashCommandProperties Properties => new SlashCommandBuilder()
+                .WithName(CommandName)
+                .WithDescription("Connect this channel to an Archipelago server")
+                .AddOption("ip", ApplicationCommandOptionType.String, "Server IP", true)
+                .AddOption("port", ApplicationCommandOptionType.Integer, "Server Port", true)
+                .AddOption("game", ApplicationCommandOptionType.String, "Game name", true)
+                .AddOption("name", ApplicationCommandOptionType.String, "Player name", true)
+                .AddOption("password", ApplicationCommandOptionType.String, "Optional password", false)
+                .Build();
 
-		public ConnectCommand(
+        public ConnectCommand(
 			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
 			ConcurrentDictionary<ulong, SocketTextChannel> channelCache,
 			IChannelService channelService,

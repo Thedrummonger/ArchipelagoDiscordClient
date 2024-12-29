@@ -1,4 +1,5 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -6,5 +7,7 @@ namespace ArchipelagoDiscordClient.Commands
 	{
 		Task ExecuteAsync(SocketSlashCommand command);
 		string CommandName { get; }
-	}
+        SlashCommandProperties Properties { get; }
+
+    }
 }

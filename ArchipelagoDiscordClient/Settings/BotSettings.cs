@@ -7,8 +7,4 @@
 		public int DiscordRateLimitDelay { get; set; } = 500;
         public string BotToken { get; set; } = "";
     }
-	public class SettingsFile(BotSettings BotSettings)
-	{
-		public BotSettings BotSettings { get; set; } = BotSettings;
-    }
 }

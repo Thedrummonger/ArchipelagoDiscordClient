@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net;
 using ArchipelagoDiscordClient.Services;
+using Discord;
 using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
@@ -11,7 +12,13 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public string CommandName => "show_sessions";
 
-		public ShowSessionsCommand(
+
+        public SlashCommandProperties Properties => new SlashCommandBuilder()
+                .WithName("show_sessions")
+                .WithDescription("Show all active Archipelago sessions in this server")
+                .Build();
+
+        public ShowSessionsCommand(
 			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
 			IChannelService channelService)
 		{

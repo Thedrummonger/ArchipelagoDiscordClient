@@ -20,37 +20,36 @@ namespace ArchipelagoDiscordClient
 
         public async Task RunBotAsync()
         {
-			var ConfigFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DrathBot", "Archipelago");
-            var ConfigFileName = "appsettings.json";
-            var ConfigFileFullPath = Path.Combine(ConfigFilePath, ConfigFileName);
-            if (!Path.Exists(ConfigFilePath)) 
+			var configFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DrathBot", "Archipelago");
+            var configFileName = "appsettings.json";
+            var configFileFullPath = Path.Combine(configFilePath, configFileName);
+            if (!Path.Exists(configFilePath)) 
 			{
-				Directory.CreateDirectory(ConfigFilePath); 
+				Directory.CreateDirectory(configFilePath); 
 			}
-			if (!File.Exists(ConfigFileFullPath))
-			{
-				File.WriteAllText(ConfigFileFullPath, new SettingsFile(new BotSettings()).ToFormattedJson());
-			}
-			var serviceCollection = new ServiceCollection();
-			var configuration = new ConfigurationBuilder()
-				.SetBasePath(ConfigFilePath)
-				.AddJsonFile(ConfigFileName, optional: false, reloadOnChange: true)
-				.Build();
+            if (!File.Exists(configFileFullPath))
+            {
+                File.WriteAllText(configFileFullPath, new BotSettings().ToFormattedJson());
+            }
 
-			// Register configuration section (e.g., BotSettings)
-			serviceCollection.Configure<BotSettings>(configuration.GetSection("BotSettings"));
+            var serviceCollection = new ServiceCollection();
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile(configFileFullPath, optional: false, reloadOnChange: true)
+                .Build();
 
-			// Call the method to register services
-			serviceCollection.ConfigureServices();
+            serviceCollection.Configure<BotSettings>(configuration);
+
+            // Call the method to register services
+            serviceCollection.ConfigureServices();
 			var serviceProvider = serviceCollection.BuildServiceProvider();
 			var discordEventHandler = serviceProvider.GetRequiredService<IDiscordEventHandler>();
 			discordEventHandler.SubscribeToDiscordEvents();
 
-            var botSettings = serviceProvider.GetRequiredService<IOptions<BotSettings>>().Value;
+			var botSettings = serviceProvider.GetRequiredService<IOptions<BotSettings>>().Value;
 
             if (string.IsNullOrEmpty(botSettings.BotToken))
 			{
-				throw new Exception($"Please enter you bot token in {ConfigFileFullPath}");
+				throw new Exception($"Please enter you bot token in {configFileFullPath}");
             }
 
             var discordClient = serviceProvider.GetRequiredService<DiscordSocketClient>();

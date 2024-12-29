@@ -2,6 +2,7 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using ArchipelagoDiscordClient.Services;
+using Discord;
 using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
@@ -13,7 +14,12 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public string CommandName => "show_hints";
 
-		private readonly IMessageQueueService _messageQueueService;
+        public SlashCommandProperties Properties => new SlashCommandBuilder()
+                .WithName("show_hints")
+                .WithDescription("Shows all hint for the current player")
+                .Build();
+
+        private readonly IMessageQueueService _messageQueueService;
 
 		public ShowHintsCommand(
 			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
