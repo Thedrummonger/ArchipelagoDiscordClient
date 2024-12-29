@@ -17,7 +17,7 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
-		private readonly IChannelService _channelService;
+        private readonly IChannelService _channelService;
 		private readonly IMessageQueueService _messageQueueService;
 		private readonly BotSettings _settings;
 
