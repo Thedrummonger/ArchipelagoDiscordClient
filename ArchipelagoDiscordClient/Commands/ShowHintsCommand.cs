@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
+using ArchipelagoDiscordClient.Constants;
 using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
@@ -12,10 +13,10 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
-		public string CommandName => "show_hints";
+		public string CommandName => CommandTypes.ShowHintsCommand;
 
         public SlashCommandProperties Properties => new SlashCommandBuilder()
-                .WithName("show_hints")
+                .WithName(CommandName)
                 .WithDescription("Shows all hint for the current player")
                 .Build();
 

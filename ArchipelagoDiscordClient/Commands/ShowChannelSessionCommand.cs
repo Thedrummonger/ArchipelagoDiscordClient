@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using Discord.WebSocket;
 using Discord;
+using ArchipelagoDiscordClient.Constants;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -10,10 +11,10 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
-		public string CommandName => "show_channel_session";
+		public string CommandName => CommandTypes.ShowChannelSessionCommand;
 
         public SlashCommandProperties Properties => new SlashCommandBuilder()
-                .WithName("show_channel_session")
+                .WithName(CommandName)
                 .WithDescription("Show the active Archipelago session for this channel")
                 .Build();
 

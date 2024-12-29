@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using ArchipelagoDiscordClient.Settings;
 using Discord;
+using ArchipelagoDiscordClient.Constants;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -20,7 +21,7 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly IMessageQueueService _messageQueueService;
 		private readonly BotSettings _settings;
 
-		public string CommandName => "connect";
+		public string CommandName => CommandTypes.ConnectCommand;
         public SlashCommandProperties Properties => new SlashCommandBuilder()
                 .WithName(CommandName)
                 .WithDescription("Connect this channel to an Archipelago server")

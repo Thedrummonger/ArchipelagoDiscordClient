@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using Archipelago.MultiClient.Net;
+﻿using Archipelago.MultiClient.Net;
+using ArchipelagoDiscordClient.Constants;
 using Discord;
 using Discord.WebSocket;
 
@@ -9,10 +9,10 @@ namespace ArchipelagoDiscordClient.Commands
 	{
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 
-		public string CommandName => "disconnect";
+		public string CommandName => CommandTypes.DisconnectCommand;
 
         public SlashCommandProperties Properties => new SlashCommandBuilder()
-                .WithName("disconnect")
+                .WithName(CommandName)
                 .WithDescription("Disconnect this channel from the Archipelago server")
                 .Build();
 
