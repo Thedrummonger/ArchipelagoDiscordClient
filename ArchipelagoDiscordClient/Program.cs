@@ -14,15 +14,19 @@ namespace ArchipelagoDiscordClient
         private DiscordSocketClient _client;
 
         // Dictionary structure: GuildID -> ChannelID -> ArchipelagoSession
-        private Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions = new Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>>();
-        private Dictionary<ulong, string> _originalChannelNames = new Dictionary<ulong, string>();
+        private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions = [];
 
-        private Dictionary<SocketTextChannel, List<string>> _sendQueue = new Dictionary<SocketTextChannel, List<string>>();
+        private readonly Dictionary<ulong, string> _originalChannelNames = [];
 
-        private Dictionary<ulong, SocketTextChannel?> ChannelCache = new Dictionary<ulong, SocketTextChannel?>();
+        private readonly Dictionary<SocketTextChannel, List<string>> _sendQueue = [];
 
+        private readonly Dictionary<ulong, SocketTextChannel?> ChannelCache = [];
+
+        public static readonly int DiscordRateLimitDelay = 500;
+
+        //TODO, add some commands to customize and show these values.
         private HashSet<string> IgnoreTags = ["tracker"];
-        private bool IgnoreAllClients = false;
+        private bool IgnoreAllClientMessages = false;
 
         static async Task Main(string[] args)
         {
@@ -32,17 +36,16 @@ namespace ArchipelagoDiscordClient
 
         public async Task RunBotAsync()
         {
-            Task.Run(() => ProcessMessageQueueAsync());
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
                 LogLevel = LogSeverity.Info,
-                GatewayIntents = GatewayIntents.All
+                GatewayIntents = GatewayIntents.All //I'm to lazy to figure out exactly what intents are needed, gimme all
             });
 
             _client.Log += LogAsync;
             _client.Ready += ReadyAsync;
             _client.SlashCommandExecuted += SlashCommandHandler;
-            _client.MessageReceived += HandleMessageReceivedAsync;
+            _client.MessageReceived += HandleDiscordMessageReceivedAsync;
 
             if (!File.Exists("bot_token.txt"))
             {
@@ -54,7 +57,7 @@ namespace ArchipelagoDiscordClient
             string token;
             try
             {
-                token = await File.ReadAllTextAsync("bot_token.txt");
+                token = File.ReadAllText("bot_token.txt");
                 if (string.IsNullOrWhiteSpace(token))
                 {
                     Console.WriteLine("The bot token file is empty.");
@@ -70,6 +73,10 @@ namespace ArchipelagoDiscordClient
             await _client.LoginAsync(TokenType.Bot, token.Trim());
             await _client.StartAsync();
 
+            //Run a background task to constantly send messages in the send queue
+            Task.Run(() => ProcessMessageQueueAsync());
+
+            //TODO, maybe just replace this with a loop to handle console commands on the server it's self
             await Task.Delay(-1);
         }
 
@@ -120,6 +127,8 @@ namespace ArchipelagoDiscordClient
             }
         }
 
+        //Getting a channel via this method will cache any unknown channels and pull from the cache as needed,
+        //that way we don't make constant calls to the discord api and rate limit the bot 
         public SocketTextChannel? GetChannel(ulong id)
         {
             if (!ChannelCache.TryGetValue(id, out SocketTextChannel? channel))
@@ -159,9 +168,8 @@ namespace ArchipelagoDiscordClient
 
         private async Task HandleShowHintsCommand(SocketSlashCommand command)
         {
-            var guildId = command.GuildId ?? 0;
-            var channelId = command.Channel.Id;
-            if (command.Channel is not SocketTextChannel socketTextChannel)
+            Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
+            if (socketTextChannel is null)
             {
                 await command.RespondAsync("Only Text Channels are Supported", ephemeral: true); 
                 return; 
@@ -193,29 +201,21 @@ namespace ArchipelagoDiscordClient
                 var FoundString = hint.Found ? 
                     Utility.ColorString("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
                     Utility.ColorString("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
+
                 if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Plum); }
                 else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
                 else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Salmon); }
                 else { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Cyan); }
+
                 Location = Utility.ColorString(Location, Archipelago.MultiClient.Net.Models.Color.Green);
 
-                if (FindingPlayer.Slot == session.ConnectionInfo.Slot) 
-                { 
-                    FindingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta); 
-                }
-                else
-                {
-                    FindingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
-                }
+                FindingPlayerName = FindingPlayer.Slot == session.ConnectionInfo.Slot ?
+                    Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta) :
+                    Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
 
-                if (ReceivingPlayer.Slot == session.ConnectionInfo.Slot)
-                {
-                    ReceivingPlayerName = Utility.ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta);
-                }
-                else
-                {
-                    ReceivingPlayerName = Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
-                }
+                ReceivingPlayerName = ReceivingPlayer.Slot == session.ConnectionInfo.Slot ?
+                    Utility.ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta) :
+                    Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
 
                 string HintLine = $"{FindingPlayerName} has {Item} at {Location} for {ReceivingPlayerName} ({FoundString})";
                 Messages.Add(HintLine);
@@ -225,21 +225,18 @@ namespace ArchipelagoDiscordClient
                 await command.RespondAsync("No hints available for this slot.", ephemeral: true);
                 return; 
             }
-            //var Message = $"```ansi\n{string.Join('\n', Messages)}\n```";
+
             await command.RespondAsync($"Hints for {session.Players.GetPlayerName(session.ConnectionInfo.Slot)}", ephemeral: false);
             foreach (var i in Messages) 
             {
                 QueueMessage(socketTextChannel, i);
             }
-            //await channel.SendMessageAsync(Message);
         }
 
         private async Task HandleConnectCommand(SocketSlashCommand command)
         {
-            var guildId = command.GuildId ?? 0;
-            var channelId = command.Channel.Id;
-            string channelName = command.Channel?.Name ?? channelId.ToString();
-            if (command.Channel is not SocketTextChannel socketTextChannel)
+            Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
+            if (socketTextChannel is null)
             {
                 await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
                 return;
@@ -259,7 +256,7 @@ namespace ArchipelagoDiscordClient
                 return;
             }
 
-            // Extract parameters
+            // Extract parameters (surely there is a better way to do this? but this is how Discord.net documentation said to do it)
             var ip = command.Data.Options.FirstOrDefault(option => option.Name == "ip")?.Value as string;
             var port = (long?)command.Data.Options.FirstOrDefault(option => option.Name == "port")?.Value;
             var game = command.Data.Options.FirstOrDefault(option => option.Name == "game")?.Value as string;
@@ -268,13 +265,13 @@ namespace ArchipelagoDiscordClient
 
             Console.WriteLine($"Connecting {channelId} to {ip}:{port} as {name} playing {game}");
             await command.RespondAsync($"Connecting {channelName} to {ip}:{port} as {name} playing {game}...");
-            //await command.DeferAsync();
 
             // Create a new session
             try
             {
                 var session = ArchipelagoSessionFactory.CreateSession(ip, (int)port);
                 Console.WriteLine($"Trying to connect");
+                //Probably doesn't need ItemsHandlingFlags.AllItems
                 LoginResult result = session.TryConnectAndLogin(game, name, ItemsHandlingFlags.AllItems, new Version(0, 5, 1), ["Tracker"], null, password, true);
 
                 if (result is LoginFailure failure)
@@ -290,26 +287,28 @@ namespace ArchipelagoDiscordClient
                 {
                     StringBuilder FormattedMessage = new StringBuilder();
                     StringBuilder RawMessage = new StringBuilder();
+                    //AP messages are split into parts as each word is colored depending on what it is
+                    //With the coloring method, we can luckily translate this to discord.
                     foreach (var part in message.Parts) 
                     { 
                         FormattedMessage.Append(Utility.ColorString(part.Text, part.Color));
                         FormattedMessage.Append(part.Text);
                     }
-                    if (GetChannel(channelId) is not SocketTextChannel channel) { return; }
                     if (string.IsNullOrWhiteSpace(FormattedMessage.ToString())) { return; }
                     Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
                     if (!CheckMessageTags(RawMessage.ToString())) { return; }
-                    QueueMessage(channel, FormattedMessage.ToString());
-                    //await channel.SendMessageAsync(stringBuilder.ToString());
+                    QueueMessage(socketTextChannel, FormattedMessage.ToString());
                 };
                 session.Socket.SocketClosed += async (reason) =>
                 {
                     await CleanAndCloseChannel(guildId, channelId);
+                    QueueMessage(socketTextChannel, $"Disconnected from Archipelago server\n{reason}");
                 };
 
                 // Store the session
                 _activeSessions[guildId][channelId] = session;
 
+                //TODO revisit this, it works but for some reason it keeps triggering a rate limit from discord.
                 if (command.Channel is SocketTextChannel textChannel)
                 {
                     //_originalChannelNames[channelId] = textChannel.Name;
@@ -329,17 +328,25 @@ namespace ArchipelagoDiscordClient
             bool IsClient = Utility.IsClientNotification(input, out Version version);
             if (!IsClient) { return true; }
             Console.WriteLine($"Client Connecting V{version}");
-            if (IsClient && IgnoreAllClients) { return false; }
+            if (IsClient && IgnoreAllClientMessages) { return false; }
+
+            /* Not sure if I'll ever use this, but I don't want to write the regex again
+            int Team = -1;
+            string TeamPattern = @"\(Team #(\d+)\)";
+            Match TeamMatch = Regex.Match(input, TeamPattern);
+            if (TeamMatch.Success && int.TryParse(TeamMatch.Groups[1].Value, out int ParsedTeam))
+                Team = ParsedTeam;
+            */
 
             string TagPattern = @"\[(.*?)\]"; //Tags are defined in brackets
-            MatchCollection matches = Regex.Matches(input, TagPattern);
+            MatchCollection TagMatches = Regex.Matches(input, TagPattern);
             HashSet<string> tags = [];
             HashSet<string> IgnoredTags = [];
-            if (matches.Count > 0)
+            if (TagMatches.Count > 0)
             {
-                string lastMatch = matches[^1].Groups[1].Value; //Tags are always at the end of a message
-                string[] parts = lastMatch.Split(',');          //I don't think any brackets would ever appear other than the tags
-                foreach (string part in parts)                  //but just pick the last instance of brackets to be safe
+                string lastMatch = TagMatches[^1].Groups[1].Value; //Tags are always at the end of a message
+                string[] parts = lastMatch.Split(',');             //I don't think any brackets would ever appear other than the tags
+                foreach (string part in parts)                     //but just pick the last instance of brackets to be safe
                 {
                     string PartTrimmed = part.Trim();
                     if (!PartTrimmed.StartsWith("'") || !PartTrimmed.EndsWith("'")) { continue; } //Probably more unnecessary checking
@@ -366,9 +373,8 @@ namespace ArchipelagoDiscordClient
 
         private async Task HandleDisconnectCommand(SocketSlashCommand command)
         {
-            var guildId = command.GuildId ?? 0;
-            var channelId = command.Channel.Id;
-            if (command.Channel is not SocketTextChannel socketTextChannel)
+            Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
+            if (socketTextChannel is null)
             {
                 await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
                 return;
@@ -399,6 +405,8 @@ namespace ArchipelagoDiscordClient
             {
                 _activeSessions.Remove(guildId);
             }
+
+            //TODO revisit this, it works but for some reason it keeps triggering a rate limit from discord.
             if (channel is SocketTextChannel textChannel && _originalChannelNames.TryGetValue(channelId, out var originalName))
             {
                 //await textChannel.ModifyAsync(prop => prop.Name = originalName);
@@ -417,7 +425,6 @@ namespace ArchipelagoDiscordClient
                 return;
             }
 
-            // Build the response
             var response = "Active Archipelago Sessions:\n";
             foreach (var (channelId, session) in guildSessions)
             {
@@ -434,9 +441,8 @@ namespace ArchipelagoDiscordClient
 
         private async Task HandleShowChannelSessionCommand(SocketSlashCommand command)
         {
-            var guildId = command.GuildId ?? 0;
-            var channelId = command.Channel.Id;
-            if (command.Channel is not SocketTextChannel socketTextChannel)
+            Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
+            if (socketTextChannel is null)
             {
                 await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
                 return;
@@ -458,7 +464,13 @@ namespace ArchipelagoDiscordClient
             await command.RespondAsync(response, ephemeral: true);
         }
 
-        private async Task HandleMessageReceivedAsync(SocketMessage message)
+        // TODO: Due to the way Archipelago handles "chat" messages, any message sent to AP 
+        // is broadcast to all clients, including the one that originally sent it. 
+        // This results in messages being duplicated in the Discord chat.
+        // Ideally, I want to avoid posting a message to Discord if it originated 
+        // from the same channel, but I can't think of a good way to track that. 
+
+        private async Task HandleDiscordMessageReceivedAsync(SocketMessage message)
         {
             // Ignore messages from bots
             if (message.Author.IsBot) return;
@@ -474,16 +486,17 @@ namespace ArchipelagoDiscordClient
             if (_activeSessions.TryGetValue(guildId, out var guildSessions) && guildSessions.TryGetValue(channelId, out var session))
             {
                 if (string.IsNullOrWhiteSpace(message.Content)) { return; }
+                string Message = $"[Discord: {message.Author.Username}] {message.Content}";
                 try
                 {
                     // Send the message to the Archipelago server
-                    session.Socket.SendPacket(new SayPacket() { Text = message.Content } );
+                    session.Socket.SendPacket(new SayPacket() { Text = Message } );
                     Console.WriteLine($"Message sent to Archipelago from {message.Author.Username} in {message.Channel.Name}: {message.Content}");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Failed to send message to Archipelago: {ex.Message}");
-                    QueueMessage(textChannel, "Error: Unable to send message to the Archipelago server.");
+                    QueueMessage(textChannel, $"Error: Unable to send message to the Archipelago server.\n{ex.Message}");
                     //await textChannel.SendMessageAsync("Error: Unable to send message to the Archipelago server.");
                 }
             }
@@ -496,26 +509,37 @@ namespace ArchipelagoDiscordClient
         }
         private async Task ProcessMessageQueueAsync()
         {
+            //Discord only allows 50 api calls per second, or 1 every 20 milliseconds
+            //With how fast archipelago sends data sometimes, it's really easy to hit this
+            //To get around this, anytime I send a message to a discord channel I send it through this queue instead.
+            //The current delay of 500 ms per action is way overkill and can probably be brought down eventually.
             while (true)
             {
                 foreach (var i in _sendQueue)
                 {
                     if (i.Value.Count == 0) { continue; }
                     List<string> sendQueue = [];
-                    int MessageLength = 6; //Include the formatter
+                    int MessageLength = 10; //Include the formatter (```ansi```)
+
+                    //Discord message limit is 2000, but im capping at 1500 for some padding. unfortunately I didn't write this logic well,
+                    //it should be checking the final message length before adding it to the final message and breaking out of the loop if
+                    //it *would* exceeded the limit. I'll fix it later :)
                     while (i.Value.Count > 0 && MessageLength < 1500)
                     {
                         MessageLength += i.Value[0].Length + 2; //Include the new line chars that will be added later
                         sendQueue.Add(i.Value[0]);
                         i.Value.RemoveAt(0);
                     }
+                    //We format the message in a code block with the "ansi" formatting. this makes our color codes color the discord message.
+                    //https://gist.github.com/kkrypt0nn/a02506f3712ff2d1c8ca7c9e0aed7c06
                     string FormattedMessage = $"```ansi\n{string.Join("\n\n", sendQueue)}\n```";
                     Console.WriteLine($"Sending {sendQueue.Count} Queued messages to channel {i.Key.Name}");
                     await i.Key.SendMessageAsync(FormattedMessage);
-                    await Task.Delay(500);
+                    await Task.Delay(DiscordRateLimitDelay); //Wait before processing more messages to avoid rate limit
                 }
-                // No messages to process; wait briefly
-                await Task.Delay(500);
+                //Wait before processing more messages to avoid rate limit
+                //This await could probably be removed? or at least significantly lowered. 
+                await Task.Delay(DiscordRateLimitDelay);
             }
         }
     }
