@@ -27,22 +27,36 @@ namespace ArchipelagoDiscordClient.Extensions
 			services.AddSingleton(new Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>>());
 			services.AddSingleton(new ConcurrentDictionary<ulong, SocketTextChannel>());
 
-			// Register services
+			RegisterCommands(services);
+			RegisterServices(services);
+			RegisterHandlers(services);
+		}
+
+		private static void RegisterCommands(IServiceCollection services)
+		{
 			services.AddSingleton<ICommand, ConnectCommand>();
 			services.AddSingleton<ICommand, DisconnectCommand>();
 			services.AddSingleton<ICommand, ShowSessionsCommand>();
 			services.AddSingleton<ICommand, ShowChannelSessionCommand>();
 			services.AddSingleton<ICommand, ShowHintsCommand>();
-            services.AddSingleton<ICommand, IgnoreClientsCommand>();
-            services.AddSingleton<ICommand, AddIgnoreTypesCommand>();
-            services.AddSingleton<ICommand, DelIgnoreTypesCommand>();
-            services.AddSingleton<ICommand, ListIgnoreTypesCommand>();
-            services.AddSingleton<ICommandService, CommandService>();
+      services.AddSingleton<ICommand, IgnoreClientsCommand>();
+      services.AddSingleton<ICommand, AddIgnoreTypesCommand>();
+      services.AddSingleton<ICommand, DelIgnoreTypesCommand>();
+      services.AddSingleton<ICommand, ListIgnoreTypesCommand>();
+			services.AddSingleton<ICommand, AssignUserToPlayerCommand>();
+		}
+
+		private static void RegisterServices(IServiceCollection services)
+		{
+			services.AddSingleton<ICommandService, CommandService>();
 			services.AddSingleton<IDiscordCommandRegistrationService, DiscordCommandRegistrationService>();
 			services.AddSingleton<IChannelService, ChannelService>();
 			services.AddSingleton<IMessageQueueService, MessageQueueService>();
+			services.AddSingleton<IFileService, JsonFileService>();
+		}
 
-			// Register handlers
+		private static void RegisterHandlers(IServiceCollection services)
+		{
 			services.AddSingleton<IDiscordEventHandler, DiscordEventHandler>();
 			services.AddSingleton<IDiscordMessageHandler, DiscordMessageHandler>();
 			services.AddSingleton<IMessageQueueHandler, MessageQueueHandler>();
