@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net;
 using ArchipelagoDiscordClient.Constants;
+using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
@@ -8,7 +9,7 @@ namespace ArchipelagoDiscordClient.Commands
 {
 	public class ShowSessionsCommand : ICommand
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 		private readonly IChannelService _channelService;
 
 		public string CommandName => CommandTypes.ShowSessionsCommand;
@@ -19,17 +20,18 @@ namespace ArchipelagoDiscordClient.Commands
                 .Build();
 
         public ShowSessionsCommand(
-			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
+			IArchipelagoSessionService sessionService,
 			IChannelService channelService)
 		{
-			_activeSessions = activeSessions;
+			_sessionService = sessionService;
 			_channelService = channelService;
 		}
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
 			var guildId = command.GuildId ?? 0;
-			if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || guildSessions.Count == 0)
+			var guildSessions = _sessionService.GetActiveSessionsByGuildAsync(guildId);
+			if (guildSessions.Count == 0)
 			{
 				await command.RespondAsync("No active Archipelago sessions in this guild.", ephemeral: true);
 				return;

@@ -24,7 +24,6 @@ namespace ArchipelagoDiscordClient.Extensions
 			services.AddSingleton<DiscordSocketClient>();
 
 			// Register shared state
-			services.AddSingleton(new Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>>());
 			services.AddSingleton(new ConcurrentDictionary<ulong, SocketTextChannel>());
 
 			RegisterCommands(services);
@@ -53,6 +52,7 @@ namespace ArchipelagoDiscordClient.Extensions
 			services.AddSingleton<IChannelService, ChannelService>();
 			services.AddSingleton<IMessageQueueService, MessageQueueService>();
 			services.AddSingleton<IFileService, JsonFileService>();
+			services.AddSingleton<IArchipelagoSessionService, ArchipelagoSessionService>();
 		}
 
 		private static void RegisterHandlers(IServiceCollection services)

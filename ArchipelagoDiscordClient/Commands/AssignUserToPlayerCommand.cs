@@ -1,6 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using Archipelago.MultiClient.Net;
 using ArchipelagoDiscordClient.Constants;
+using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Models;
 using ArchipelagoDiscordClient.Services;
 using Discord;
@@ -10,7 +11,7 @@ namespace ArchipelagoDiscordClient.Commands
 {
 	public class AssignUserToPlayerCommand : ICommand
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 		private readonly IFileService _fileService;
 
 		public string CommandName => CommandTypes.AssignUserToPlayerCommand;
@@ -23,10 +24,10 @@ namespace ArchipelagoDiscordClient.Commands
 				.Build();
 
 		public AssignUserToPlayerCommand(
-			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
+			IArchipelagoSessionService sessionService,
 			IFileService fileService)
 		{
-			_activeSessions = activeSessions;
+			_sessionService = sessionService;
 			_fileService = fileService;
 		}
 
@@ -39,7 +40,8 @@ namespace ArchipelagoDiscordClient.Commands
 				return;
 			}
 
-			if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
+			var session = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			if (session == null)
 			{
 				await command.RespondAsync("No active Archipelago session in this channel.", ephemeral: true);
 				return;

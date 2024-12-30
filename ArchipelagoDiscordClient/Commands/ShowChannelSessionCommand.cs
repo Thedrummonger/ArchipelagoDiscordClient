@@ -1,14 +1,14 @@
-﻿using Archipelago.MultiClient.Net;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Discord.WebSocket;
 using Discord;
 using ArchipelagoDiscordClient.Constants;
+using ArchipelagoDiscordClient.Handlers;
 
 namespace ArchipelagoDiscordClient.Commands
 {
 	public class ShowChannelSessionCommand : ICommand
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
 		public string CommandName => CommandTypes.ShowChannelSessionCommand;
@@ -19,10 +19,10 @@ namespace ArchipelagoDiscordClient.Commands
                 .Build();
 
         public ShowChannelSessionCommand(
-			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
+			IArchipelagoSessionService sessionService,
 			ConcurrentDictionary<ulong, SocketTextChannel> channelCache)
 		{
-			_activeSessions = activeSessions;
+			_sessionService = sessionService;
 			_channelCache = channelCache;
 		}
 
@@ -36,14 +36,13 @@ namespace ArchipelagoDiscordClient.Commands
 			}
 			_channelCache.TryAdd(channelId, socketTextChannel);
 
-			// Check if the channel has an active session
-			if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
+			var session = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			if (session is null)
 			{
 				await command.RespondAsync("No active Archipelago session in this channel.", ephemeral: true);
 				return;
 			}
 
-			// Build the response
 			var response = $"**Active Archipelago Session**\n" +
 						   $"  **Server**: {session.Socket.Uri}\n" +
 						   $"  **Player**: {session.Players.GetPlayerName(session.ConnectionInfo.Slot)}({session.ConnectionInfo.Slot})\n";
