@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using ArchipelagoDiscordClient.Extensions;
 using Microsoft.Extensions.Options;
 using TDMUtils;
+using ArchipelagoDiscordClient.Constants;
 
 namespace ArchipelagoDiscordClient
 {
@@ -20,21 +21,18 @@ namespace ArchipelagoDiscordClient
 
         public async Task RunBotAsync()
         {
-			var configFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DrathBot", "Archipelago");
-            var configFileName = "appsettings.json";
-            var configFileFullPath = Path.Combine(configFilePath, configFileName);
-            if (!Path.Exists(configFilePath)) 
+            if (!Path.Exists(FilePaths.ConfigFilePath)) 
 			{
-				Directory.CreateDirectory(configFilePath); 
+				Directory.CreateDirectory(FilePaths.ConfigFilePath); 
 			}
-            if (!File.Exists(configFileFullPath))
+            if (!File.Exists(FilePaths.ConfigFileFullPath))
             {
-                File.WriteAllText(configFileFullPath, new BotSettings().ToFormattedJson());
+                File.WriteAllText(FilePaths.ConfigFileFullPath, new BotSettings().ToFormattedJson());
             }
 
             var serviceCollection = new ServiceCollection();
             var configuration = new ConfigurationBuilder()
-                .AddJsonFile(configFileFullPath, optional: false, reloadOnChange: true)
+                .AddJsonFile(FilePaths.ConfigFileFullPath, optional: false, reloadOnChange: true)
                 .Build();
 
             serviceCollection.Configure<BotSettings>(configuration);
@@ -49,7 +47,7 @@ namespace ArchipelagoDiscordClient
 
             if (string.IsNullOrEmpty(botSettings.BotToken))
 			{
-				throw new Exception($"Please enter you bot token in {configFileFullPath}");
+				throw new Exception($"Please enter you bot token in {FilePaths.ConfigFileFullPath}");
             }
 
             var discordClient = serviceProvider.GetRequiredService<DiscordSocketClient>();

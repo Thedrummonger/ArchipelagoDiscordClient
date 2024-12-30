@@ -17,7 +17,7 @@ namespace ArchipelagoDiscordClient.Commands
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
-		private readonly IChannelService _channelService;
+        private readonly IChannelService _channelService;
 		private readonly IMessageQueueService _messageQueueService;
 		private readonly BotSettings _settings;
 
@@ -106,7 +106,8 @@ namespace ArchipelagoDiscordClient.Commands
 					foreach (var part in message.Parts)
 					{
 						FormattedMessage.Append(Utility.ColorString(part.Text, part.Color));
-					}
+                        RawMessage.Append(part.Text);
+                    }
 					if (string.IsNullOrWhiteSpace(FormattedMessage.ToString())) { return; }
 					Console.WriteLine($"Queueing message from AP session {ip}:{port} {name} {game}");
 					if (!CheckMessageTags(RawMessage.ToString())) { return; }
