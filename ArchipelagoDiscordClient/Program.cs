@@ -21,9 +21,9 @@ namespace ArchipelagoDiscordClient
 
         public async Task RunBotAsync()
         {
-            if (!Path.Exists(FilePaths.ConfigFileFullPath)) 
+            if (!Path.Exists(FilePaths.BaseFilePath)) 
 			{
-				Directory.CreateDirectory(FilePaths.ConfigFileFullPath); 
+				Directory.CreateDirectory(FilePaths.BaseFilePath); 
 			}
             if (!File.Exists(FilePaths.ConfigFileFullPath))
             {

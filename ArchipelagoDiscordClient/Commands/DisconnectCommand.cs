@@ -1,5 +1,5 @@
-﻿using Archipelago.MultiClient.Net;
-using ArchipelagoDiscordClient.Constants;
+﻿using ArchipelagoDiscordClient.Constants;
+using ArchipelagoDiscordClient.Handlers;
 using Discord;
 using Discord.WebSocket;
 
@@ -7,7 +7,7 @@ namespace ArchipelagoDiscordClient.Commands
 {
 	public class DisconnectCommand : ICommand
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 
 		public string CommandName => CommandTypes.DisconnectCommand;
 
@@ -16,38 +16,33 @@ namespace ArchipelagoDiscordClient.Commands
                 .WithDescription("Disconnect this channel from the Archipelago server")
                 .Build();
 
-        public DisconnectCommand(Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions)
+        public DisconnectCommand(IArchipelagoSessionService sessionService)
 		{
-			_activeSessions = activeSessions;
+			_sessionService = sessionService;
 		}
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
 			Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
-
 			if (socketTextChannel is null)
 			{
 				await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
 				return;
 			}
 
-			if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.ContainsKey(channelId))
+			Console.WriteLine($"Disconnecting from {channelName} from Archipelago");
+			await command.RespondAsync($"Disconnecting from {channelName} from Archipelago...");
+
+			try
 			{
-				await command.RespondAsync("This channel is not connected to any Archipelago session.", ephemeral: true);
-				return;
+				await _sessionService.RemoveSessionAsync(guildId, channelId);
+			}
+			catch (Exception ex)
+			{
+				await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Failed to disconnect: {ex.Message}");
 			}
 
-			await CleanAndCloseChannel(guildId, channelId);
-			await command.RespondAsync($"Successfully disconnected {channelName} from Archipelago.");
-		}
-
-		private async Task CleanAndCloseChannel(ulong guildId, ulong channelId)
-		{
-			if (_activeSessions[guildId].TryGetValue(channelId, out var session))
-			{
-				await session.Socket.DisconnectAsync();
-				_activeSessions[guildId].Remove(channelId);
-			}
+			await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully disconnected {channelName} from Archipelago.");
 		}
 	}
 }

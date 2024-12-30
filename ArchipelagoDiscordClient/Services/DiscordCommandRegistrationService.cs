@@ -21,7 +21,6 @@ namespace ArchipelagoDiscordClient.Services
 		{
 			foreach(var command in _commands)
             {
-                Console.WriteLine($"registering {command.CommandName}");
 				try
                 {
                     await _client.CreateGlobalApplicationCommandAsync(command.Properties);

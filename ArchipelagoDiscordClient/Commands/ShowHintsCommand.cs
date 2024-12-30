@@ -2,6 +2,7 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using ArchipelagoDiscordClient.Constants;
+using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
@@ -10,7 +11,7 @@ namespace ArchipelagoDiscordClient.Commands
 {
 	public class ShowHintsCommand : ICommand
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
 		public string CommandName => CommandTypes.ShowHintsCommand;
@@ -23,11 +24,11 @@ namespace ArchipelagoDiscordClient.Commands
         private readonly IMessageQueueService _messageQueueService;
 
 		public ShowHintsCommand(
-			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
+			IArchipelagoSessionService sessionService,
 			ConcurrentDictionary<ulong, SocketTextChannel> channelCache,
 			IMessageQueueService messageQueueService)
 		{
-			_activeSessions = activeSessions;
+			_sessionService = sessionService;
 			_channelCache = channelCache;
 			_messageQueueService = messageQueueService;
 		}
@@ -42,8 +43,8 @@ namespace ArchipelagoDiscordClient.Commands
 			}
 			_channelCache.TryAdd(channelId, socketTextChannel);
 
-			// Check if the guild and channel have an active session
-			if (!_activeSessions.TryGetValue(guildId, out var guildSessions) || !guildSessions.TryGetValue(channelId, out var session))
+			var session = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			if (session is null)
 			{
 				await command.RespondAsync("This channel is not connected to any Archipelago session.", ephemeral: true);
 				return;
