@@ -1,16 +1,16 @@
 ﻿using System.Text.RegularExpressions;
 using Archipelago.MultiClient.Net;
 using ArchipelagoDiscordClient.Constants;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Helpers;
 using ArchipelagoDiscordClient.Models;
 using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
+using TDMUtils;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	public class AssignUserToPlayerCommand : ICommand
+    public class AssignUserToPlayerCommand : ICommand
 	{
 		private readonly IArchipelagoSessionService _sessionService;
 		private readonly IFileService _fileService;
@@ -48,8 +48,8 @@ namespace ArchipelagoDiscordClient.Commands
 				return;
 			}
 
-			var user = command.Data.Options.FirstOrDefault(option => option.Name == "user")?.Value as SocketUser;
-			var players = command.Data.Options.FirstOrDefault(option => option.Name == "players")?.Value as string;
+			var user = commandData.GetArg("user")?.Value as SocketUser;
+			var players = commandData.GetArg("players")?.Value as string;
 			if(!await IsInputValid(command, user, players))
 			{
 				return;
@@ -60,7 +60,7 @@ namespace ArchipelagoDiscordClient.Commands
 				UserId = user!.Id.ToString(),
 				Username = user.Username,
 				Discriminator = user.Discriminator,
-				Players = players!.Split(',').Select(p => p.Trim()).ToList()
+				Players = players!.TrimSplit(",").ToList()
 			};
 
 			var sessionPlayers = session.Players.AllPlayers.Select(player => player.Name).ToList();

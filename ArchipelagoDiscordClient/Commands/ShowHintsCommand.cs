@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Archipelago.MultiClient.Net.Enums;
 using ArchipelagoDiscordClient.Constants;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Helpers;
 using ArchipelagoDiscordClient.Services;
 using Discord;
@@ -9,7 +8,7 @@ using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	public class ShowHintsCommand : ICommand
+    public class ShowHintsCommand : ICommand
 	{
 		private readonly IArchipelagoSessionService _sessionService;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;

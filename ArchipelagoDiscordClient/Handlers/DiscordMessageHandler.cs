@@ -3,21 +3,22 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Packets;
 using ArchipelagoDiscordClient.Services;
 using Discord.WebSocket;
+using TDMUtils;
 
 namespace ArchipelagoDiscordClient.Handlers
 {
 	public class DiscordMessageHandler : IDiscordMessageHandler
 	{
-		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
+		private readonly IArchipelagoSessionService _sessionService;
 		private readonly IMessageQueueService _messageQueueService;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 
 		public DiscordMessageHandler(
-			Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> activeSessions,
+			IArchipelagoSessionService sessionService,
 			IMessageQueueService messageQueueService,
 			ConcurrentDictionary<ulong, SocketTextChannel> channelCache)
 		{
-			_activeSessions = activeSessions;
+            _sessionService = sessionService;
 			_messageQueueService = messageQueueService;
 			_channelCache = channelCache;
 		}
@@ -39,24 +40,21 @@ namespace ArchipelagoDiscordClient.Handlers
 			var guildId = textChannel.Guild.Id;
 			var channelId = textChannel.Id;
 
-			// Check if the channel exists in our dictionary
-			if (_activeSessions.TryGetValue(guildId, out var guildSessions) && guildSessions.TryGetValue(channelId, out var session))
-			{
-				if (string.IsNullOrWhiteSpace(message.Content)) { return; }
-				string Message = $"[Discord: {message.Author.Username}] {message.Content}";
-				try
-				{
-					// Send the message to the Archipelago server
-					await session.Socket.SendPacketAsync(new SayPacket() { Text = Message });
-					Console.WriteLine($"Message sent to Archipelago from {message.Author.Username} in {message.Channel.Name}: {message.Content}");
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"Failed to send message to Archipelago: {ex.Message}");
-					_messageQueueService.QueueMessage(textChannel, $"Error: Unable to send message to the Archipelago server.\n{ex.Message}");
-					//await textChannel.SendMessageAsync("Error: Unable to send message to the Archipelago server.");
-				}
-			}
+			var activeSession = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			if (activeSession is null) { return; }
+            if (message.Content.IsNullOrWhiteSpace()) { return; }
+            string discordMessage = $"[Discord: {message.Author.Username}] {message.Content}";
+            try
+            {
+                // Send the message to the Archipelago server
+                await activeSession.Socket.SendPacketAsync(new SayPacket() { Text = discordMessage });
+                Console.WriteLine($"Message sent to Archipelago from {message.Author.Username} in {message.Channel.Name}: {message.Content}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to send message to Archipelago: {ex.Message}");
+                _messageQueueService.QueueMessage(textChannel, $"Error: Unable to send message to the Archipelago server.\n{ex.Message}");
+            }
 		}
 	}
 }

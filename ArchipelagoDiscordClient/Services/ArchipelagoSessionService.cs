@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Helpers;
 using ArchipelagoDiscordClient.Models;
 using ArchipelagoDiscordClient.Settings;
@@ -9,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace ArchipelagoDiscordClient.Services
 {
-	public class ArchipelagoSessionService : IArchipelagoSessionService
+    public class ArchipelagoSessionService : IArchipelagoSessionService
     {
         private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly BotSettings _settings;
@@ -28,21 +27,6 @@ namespace ArchipelagoDiscordClient.Services
             _settings = settings.Value;
 
 		}
-
-        public bool TryGetSession(ulong guildId, ulong channelId, out ArchipelagoSession? session)
-        {
-            session = null;
-            if (_activeSessions.TryGetValue(guildId, out var guildSessions))
-            {
-                if (guildSessions.TryGetValue(channelId, out var activeSession))
-                {
-                    session = activeSession;
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         public void CreateSession(CreateSessionModel model)
         {
@@ -156,7 +140,7 @@ namespace ArchipelagoDiscordClient.Services
 			return null;
 		}
 
-		public Dictionary<ulong, ArchipelagoSession> GetActiveSessionsByGuildAsync(ulong guildId)
+		public Dictionary<ulong, ArchipelagoSession> GetActiveSessionsByGuildIdAsync(ulong guildId)
 		{
 			if (_activeSessions.TryGetValue(guildId, out var guildSessions))
 			{

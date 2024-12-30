@@ -12,7 +12,9 @@ namespace ArchipelagoDiscordClient.Services
 				var fullPath = GetFilePath(fileName);
 				if (!File.Exists(fullPath))
 				{
-					throw new FileNotFoundException("File not found", fullPath);
+					Console.WriteLine($"Creating File {fullPath}");
+					var F = File.Create(fullPath);
+					F.Close();
 				}
 
 				var jsonContent = await File.ReadAllTextAsync(fullPath);

@@ -2,12 +2,12 @@
 using Discord.WebSocket;
 using Discord;
 using ArchipelagoDiscordClient.Constants;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Helpers;
+using ArchipelagoDiscordClient.Services;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	public class ShowChannelSessionCommand : ICommand
+    public class ShowChannelSessionCommand : ICommand
 	{
 		private readonly IArchipelagoSessionService _sessionService;
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;

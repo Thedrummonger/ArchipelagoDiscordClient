@@ -1,12 +1,12 @@
 ﻿using ArchipelagoDiscordClient.Constants;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Helpers;
+using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	public class DisconnectCommand : ICommand
+    public class DisconnectCommand : ICommand
 	{
 		private readonly IArchipelagoSessionService _sessionService;
 

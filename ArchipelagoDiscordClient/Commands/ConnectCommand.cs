@@ -2,13 +2,13 @@
 using System.Collections.Concurrent;
 using Discord;
 using ArchipelagoDiscordClient.Constants;
-using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Models;
 using ArchipelagoDiscordClient.Helpers;
+using ArchipelagoDiscordClient.Services;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	public class ConnectCommand : ICommand
+    public class ConnectCommand : ICommand
 	{
 		private readonly ConcurrentDictionary<ulong, SocketTextChannel> _channelCache;
 		private readonly IArchipelagoSessionService _sessionService;
