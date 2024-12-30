@@ -8,7 +8,7 @@ using Discord.WebSocket;
 
 namespace ArchipelagoDiscordClient.Commands
 {
-	internal class AssignUserToPlayerCommand : ICommand
+	public class AssignUserToPlayerCommand : ICommand
 	{
 		private readonly Dictionary<ulong, Dictionary<ulong, ArchipelagoSession>> _activeSessions;
 		private readonly IFileService _fileService;
