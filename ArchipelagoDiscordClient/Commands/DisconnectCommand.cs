@@ -1,5 +1,6 @@
 ﻿using ArchipelagoDiscordClient.Constants;
 using ArchipelagoDiscordClient.Handlers;
+using ArchipelagoDiscordClient.Helpers;
 using Discord;
 using Discord.WebSocket;
 
@@ -23,26 +24,26 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
-			Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
-			if (socketTextChannel is null)
+            var commandData = command.GetCommandData();
+			if (commandData.socketTextChannel is null)
 			{
 				await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
 				return;
 			}
 
-			Console.WriteLine($"Disconnecting from {channelName} from Archipelago");
-			await command.RespondAsync($"Disconnecting from {channelName} from Archipelago...");
+			Console.WriteLine($"Disconnecting from {commandData.channelName} from Archipelago");
+			await command.RespondAsync($"Disconnecting from {commandData.channelName} from Archipelago...");
 
 			try
 			{
-				await _sessionService.RemoveSessionAsync(guildId, channelId);
+				await _sessionService.RemoveSessionAsync(commandData.guildId, commandData.channelId);
 			}
 			catch (Exception ex)
 			{
 				await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Failed to disconnect: {ex.Message}");
 			}
 
-			await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully disconnected {channelName} from Archipelago.");
+			await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully disconnected {commandData.channelName} from Archipelago.");
 		}
 	}
 }

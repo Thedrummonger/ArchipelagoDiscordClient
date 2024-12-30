@@ -3,6 +3,7 @@ using Discord.WebSocket;
 using Discord;
 using ArchipelagoDiscordClient.Constants;
 using ArchipelagoDiscordClient.Handlers;
+using ArchipelagoDiscordClient.Helpers;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -28,15 +29,15 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
-			Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
-			if (socketTextChannel is null)
+            var commandData = command.GetCommandData();
+			if (commandData.socketTextChannel is null)
 			{
 				await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
 				return;
 			}
-			_channelCache.TryAdd(channelId, socketTextChannel);
+			_channelCache.TryAdd(commandData.channelId, commandData.socketTextChannel);
 
-			var session = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			var session = _sessionService.GetActiveSessionByChannelIdAsync(commandData.guildId, commandData.channelId);
 			if (session is null)
 			{
 				await command.RespondAsync("No active Archipelago session in this channel.", ephemeral: true);

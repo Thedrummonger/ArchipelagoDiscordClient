@@ -7,7 +7,7 @@ namespace ArchipelagoDiscordClient.Helpers
 	{
 		public static bool CheckMessageTags(this string input, BotSettings settings)
 		{
-			bool IsClient = Utility.IsClientNotification(input, out Version version);
+			bool IsClient = input.IsClientNotificationString(out Version version);
 			if (!IsClient) { return true; }
 			Console.WriteLine($"Client Connecting V{version}");
 			if (IsClient && settings.IgnoreAllClientMessages) { return false; }
@@ -46,6 +46,24 @@ namespace ArchipelagoDiscordClient.Helpers
 			}
 
 			return true;
-		}
-	}
+        }
+        //Checks if the AP message is a client notification
+        //Mostly messages about a client connecting or disconnecting
+        public static bool IsClientNotificationString(this string message, out Version version)
+        {
+            string pattern = @"Client\((\d+\.\d+\.\d+)\)"; //Check for string with the client version info.
+                                                           //This is consistent for all client connection messages
+                                                           //We can assume if it has this string, it a client message
+            version = new Version(0, 0, 0);
+            Match match = Regex.Match(message, pattern);
+            if (match.Success)
+            {
+                string versionString = match.Groups[1].Value; //Pull out the version from the client info string, currently unused.
+                if (Version.TryParse(versionString, out Version? ParsedVersion))
+                    version = ParsedVersion;
+                return true;
+            }
+            return false;
+        }
+    }
 }

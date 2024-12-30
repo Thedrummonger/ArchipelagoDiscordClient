@@ -73,7 +73,7 @@ namespace ArchipelagoDiscordClient.Services
 				//With the coloring method, we can luckily translate this to discord.
 				foreach (var part in message.Parts)
 				{
-					FormattedMessage.Append(Utility.ColorString(part.Text, part.Color));
+					FormattedMessage.Append(part.Text.SetColor(part.Color));
 					RawMessage.Append(part.Text);
 				}
 				if (string.IsNullOrWhiteSpace(FormattedMessage.ToString())) { return; }

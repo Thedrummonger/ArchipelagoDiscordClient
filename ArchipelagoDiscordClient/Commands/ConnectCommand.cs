@@ -4,6 +4,7 @@ using Discord;
 using ArchipelagoDiscordClient.Constants;
 using ArchipelagoDiscordClient.Handlers;
 using ArchipelagoDiscordClient.Models;
+using ArchipelagoDiscordClient.Helpers;
 
 namespace ArchipelagoDiscordClient.Commands
 {
@@ -33,33 +34,33 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
-			Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
-			if (socketTextChannel is null)
+            var commandData = command.GetCommandData();
+			if (commandData.socketTextChannel is null)
 			{
 				await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
 				return;
 			}
 
-			_channelCache.TryAdd(channelId, socketTextChannel);
+			_channelCache.TryAdd(commandData.channelId, commandData.socketTextChannel);
 			var model = new CreateSessionModel
 			{
-				GuildId = guildId,
-				ChannelId = channelId,
-				IpAddress = (string)command.Data.Options.FirstOrDefault(option => option.Name == "ip")!.Value,
-				Port = (long)command.Data.Options.FirstOrDefault(option => option.Name == "port")!.Value!,
-				Game = (string)command.Data.Options.FirstOrDefault(option => option.Name == "game")!.Value,
-				Name = (string)command.Data.Options.FirstOrDefault(option => option.Name == "name")!.Value,
-				Password = (string?)command.Data.Options.FirstOrDefault(option => option.Name == "password")?.Value,
-				Channel = socketTextChannel
+				GuildId = commandData.guildId,
+				ChannelId = commandData.channelId,
+				IpAddress = (string)commandData.GetArg("ip")!.Value,
+				Port = (long)commandData.GetArg("port")!.Value!,
+				Game = (string)commandData.GetArg("game")!.Value,
+				Name = (string)commandData.GetArg("name")!.Value,
+				Password = (string?)commandData.GetArg("password")?.Value,
+				Channel = commandData.socketTextChannel
 			};
 
-			Console.WriteLine($"Connecting {channelId} to {model.IpAddress}:{model.Port} as {model.Name} playing {model.Game}");
-			await command.RespondAsync($"Connecting {channelId} to {model.IpAddress}:{model.Port} as {model.Name} playing {model.Game}...");
+			Console.WriteLine($"Connecting {commandData.channelId} to {model.IpAddress}:{model.Port} as {model.Name} playing {model.Game}");
+			await command.RespondAsync($"Connecting {commandData.channelId} to {model.IpAddress}:{model.Port} as {model.Name} playing {model.Game}...");
 
 			try
 			{
 				_sessionService.CreateSession(model);
-				await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully connected channel {channelName} to Archipelago server at {model.IpAddress}:{model.Port} as {model.Name}.");
+				await command.ModifyOriginalResponseAsync(msg => msg.Content = $"Successfully connected channel {commandData.channelName} to Archipelago server at {model.IpAddress}:{model.Port} as {model.Name}.");
 			}
 			catch (Exception ex)
 			{

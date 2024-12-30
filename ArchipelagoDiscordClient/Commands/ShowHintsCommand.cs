@@ -1,8 +1,8 @@
 ﻿using System.Collections.Concurrent;
-using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using ArchipelagoDiscordClient.Constants;
 using ArchipelagoDiscordClient.Handlers;
+using ArchipelagoDiscordClient.Helpers;
 using ArchipelagoDiscordClient.Services;
 using Discord;
 using Discord.WebSocket;
@@ -35,15 +35,15 @@ namespace ArchipelagoDiscordClient.Commands
 
 		public async Task ExecuteAsync(SocketSlashCommand command)
 		{
-			Utility.GetCommandData(command, out ulong guildId, out ulong channelId, out string channelName, out SocketTextChannel? socketTextChannel);
-			if (socketTextChannel is null)
+            var commandData = command.GetCommandData();
+			if (commandData.socketTextChannel is null)
 			{
 				await command.RespondAsync("Only Text Channels are Supported", ephemeral: true);
 				return;
 			}
-			_channelCache.TryAdd(channelId, socketTextChannel);
+			_channelCache.TryAdd(commandData.channelId, commandData.socketTextChannel);
 
-			var session = _sessionService.GetActiveSessionByChannelIdAsync(guildId, channelId);
+			var session = _sessionService.GetActiveSessionByChannelIdAsync(commandData.guildId, commandData.channelId);
 			if (session is null)
 			{
 				await command.RespondAsync("This channel is not connected to any Archipelago session.", ephemeral: true);
@@ -66,23 +66,23 @@ namespace ArchipelagoDiscordClient.Commands
 				var ReceivingPlayerName = ReceivingPlayer.Name;
 
 				var FoundString = hint.Found ?
-					Utility.ColorString("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
-					Utility.ColorString("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
+                    ColorHelper.SetColor("Found", Archipelago.MultiClient.Net.Models.Color.Green) :
+                    ColorHelper.SetColor("Not Found", Archipelago.MultiClient.Net.Models.Color.Red);
 
-				if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Plum); }
-				else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
-				else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Salmon); }
-				else { Item = Utility.ColorString(Item, Archipelago.MultiClient.Net.Models.Color.Cyan); }
+				if (hint.ItemFlags.HasFlag(ItemFlags.Advancement)) { Item = Item.SetColor(Archipelago.MultiClient.Net.Models.Color.Plum); }
+				else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Item.SetColor(Archipelago.MultiClient.Net.Models.Color.SlateBlue); }
+				else if (hint.ItemFlags.HasFlag(ItemFlags.NeverExclude)) { Item = Item.SetColor(Archipelago.MultiClient.Net.Models.Color.Salmon); }
+				else { Item = Item.SetColor(Archipelago.MultiClient.Net.Models.Color.Cyan); }
 
-				Location = Utility.ColorString(Location, Archipelago.MultiClient.Net.Models.Color.Green);
+				Location = Location.SetColor(Archipelago.MultiClient.Net.Models.Color.Green);
 
 				FindingPlayerName = FindingPlayer.Slot == session.ConnectionInfo.Slot ?
-					Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta) :
-					Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                    FindingPlayerName.SetColor(Archipelago.MultiClient.Net.Models.Color.Magenta) :
+                    FindingPlayerName.SetColor(Archipelago.MultiClient.Net.Models.Color.Yellow);
 
 				ReceivingPlayerName = ReceivingPlayer.Slot == session.ConnectionInfo.Slot ?
-					Utility.ColorString(ReceivingPlayerName, Archipelago.MultiClient.Net.Models.Color.Magenta) :
-					Utility.ColorString(FindingPlayerName, Archipelago.MultiClient.Net.Models.Color.Yellow);
+                    ReceivingPlayerName.SetColor(Archipelago.MultiClient.Net.Models.Color.Magenta) :
+                    ReceivingPlayerName.SetColor(Archipelago.MultiClient.Net.Models.Color.Yellow);
 
 				string HintLine = $"{FindingPlayerName} has {Item} at {Location} for {ReceivingPlayerName} ({FoundString})";
 				Messages.Add(HintLine);
@@ -96,7 +96,7 @@ namespace ArchipelagoDiscordClient.Commands
 			await command.RespondAsync($"Hints for {session.Players.GetPlayerName(session.ConnectionInfo.Slot)}", ephemeral: false);
 			foreach (var i in Messages)
 			{
-				_messageQueueService.QueueMessage(socketTextChannel, i);
+				_messageQueueService.QueueMessage(commandData.socketTextChannel, i);
 			}
 		}
 	}
